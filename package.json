@@ -1,0 +1,31 @@
+{
+  "name": "detritus-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsc && node ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GoogleFeud/detritus-bot.git"
+  },
+  "author": "GoogleFeud",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GoogleFeud/detritus-bot/issues"
+  },
+  "homepage": "https://github.com/GoogleFeud/detritus-bot#readme",
+  "devDependencies": {
+    "@types/node": "^16.10.1",
+    "@typescript-eslint/eslint-plugin": "^4.32.0",
+    "@typescript-eslint/parser": "^4.32.0",
+    "eslint": "^7.32.0",
+    "typescript": "^4.4.3"
+  },
+  "dependencies": {
+    "detritus-client": "^0.16.3",
+    "dotenv": "^10.0.0"
+  }
+}
