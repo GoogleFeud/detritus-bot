@@ -1,6 +1,7 @@
 
 import dotenv from "dotenv";
 import {ShardClient} from "detritus-client";
+import { parseMessage } from "./messageParser";
 dotenv.config();
 
 (() => {
@@ -22,7 +23,8 @@ dotenv.config();
     //const commandClient = new Detritus.InteractionCommandClient(shardClient);
 
     shardClient.on("messageCreate", (payload) => {
-        console.log(payload.message.content);
+        const parsed = parseMessage(payload.message.content);
+        if (parsed) shardClient.rest.createMessage(payload.message.channelId, { content: `You said: ${parsed.map(p => p.name)}` });
     });
 
     shardClient.run();
