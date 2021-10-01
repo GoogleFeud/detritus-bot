@@ -26,6 +26,7 @@ dotenv.config();
     //const commandClient = new Detritus.InteractionCommandClient(shardClient);
 
     shardClient.on("messageCreate", (payload) => {
+        if (payload.message.author.bot) return;
         const parsed = parseMessage(payload.message.content);
         const links: Array<{name: string, link: string, description?: string}> = [];
         if (parsed && parsed.length) {
