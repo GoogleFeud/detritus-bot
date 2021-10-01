@@ -27,18 +27,29 @@ dotenv.config();
 
     shardClient.on("messageCreate", (payload) => {
         const parsed = parseMessage(payload.message.content);
-        const links: Array<string> = [];
+        const links: Array<{name: string, link: string, description?: string}> = [];
         if (parsed && parsed.length) {
             for (const query of parsed) {
                 const item = findInData(query, DATA);
                 if (item) {
-                    if (typeof item === "string") links.push(item);
-                    else links.push(item[0]);
+                    if (typeof item === "string") links.push({ link: item, name: `${query.name}${query.member ? `.${query.member}`:""}` });
+                    else links.push({link: item[0], description: item[1], name: `${query.name}${query.member ? `.${query.member}`:""}` });
                 }
             }
         }
-        if (!links.length) return;
-        shardClient.rest.createMessage(payload.message.channelId, { content: links.join("\n" )});
+        if (!links.length) {
+            payload.message.react("❌");
+            return;
+        }
+        shardClient.rest.createMessage(payload.message.channelId, { 
+            embed: {
+                description: links.map(link => `**[${link.name}](${link.link})**${link.description ? ` - ${link.description.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                footer: {
+                    text: `Searched by ${payload.message.author.username}`,
+                    iconUrl: payload.message.author.avatarUrl
+                }
+            }
+        });
     });
 
     shardClient.run();
