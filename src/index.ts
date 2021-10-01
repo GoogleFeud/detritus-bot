@@ -37,20 +37,20 @@ dotenv.config();
                     else links.push({link: item[0], description: item[1], name: `${query.name}${query.member ? `.${query.member}`:""}` });
                 }
             }
-        }
-        if (!links.length) {
-            payload.message.react("❌");
-            return;
-        }
-        shardClient.rest.createMessage(payload.message.channelId, { 
-            embed: {
-                description: links.map(link => `**[${link.name}](${link.link})**${link.description ? ` - ${link.description.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
-                footer: {
-                    text: `Searched by ${payload.message.author.username}`,
-                    iconUrl: payload.message.author.avatarUrl
-                }
+            if (!links.length) {
+                payload.message.react("❌");
+                return;
             }
-        });
+            shardClient.rest.createMessage(payload.message.channelId, { 
+                embed: {
+                    description: links.map(link => `**[${link.name}](${link.link})**${link.description ? ` - ${link.description.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                    footer: {
+                        text: `Searched by ${payload.message.author.username}`,
+                        iconUrl: payload.message.author.avatarUrl
+                    }
+                }
+            });
+        }
     });
 
     shardClient.run();
