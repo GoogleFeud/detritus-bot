@@ -1,7 +1,8 @@
 
 export interface MessageFinding {
     name: string,
-    path?: Array<string>
+    path?: Array<string>,
+    member?: string
 }
 
 export function parseMessage(msg: string) : Array<MessageFinding>|undefined {
@@ -11,12 +12,19 @@ export function parseMessage(msg: string) : Array<MessageFinding>|undefined {
     for (; ind !== -1; ind = msg.indexOf("[[", ind)) {
         const end = msg.indexOf("]]", ind);
         if (end === -1) break;
-        const content = msg.slice(ind + 2, end);
-        if (content.includes("/")) {
-            const path = content.split("/");
-            findings.push({ path, name: path.pop() as string });
+        let name = msg.slice(ind + 2, end);
+        let path;
+        let member;
+        if (name.includes("/")) {
+            path = name.split("/");
+            name = path.pop() as string;
         }
-        else findings.push({ name: content });
+        if (name.includes(".")) {
+            const [newName, newMember] = name.split(".");
+            name = newName;
+            member = newMember;
+        }
+        findings.push({ name, path, member });
         ind = end;
     }
     return findings;

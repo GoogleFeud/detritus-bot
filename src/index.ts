@@ -2,9 +2,12 @@
 import dotenv from "dotenv";
 import {ShardClient} from "detritus-client";
 import { parseMessage } from "./messageParser";
+import { fetchContent, findInData } from "./contentFetch";
 dotenv.config();
 
-(() => {
+(async () => {
+    const DATA = await fetchContent(process.env.DOCS_URL as string);
+
     const shardClient = new ShardClient(process.env.TOKEN as string, {
         cache: {
             sessions: false,
@@ -24,7 +27,18 @@ dotenv.config();
 
     shardClient.on("messageCreate", (payload) => {
         const parsed = parseMessage(payload.message.content);
-        if (parsed) shardClient.rest.createMessage(payload.message.channelId, { content: `You said: ${parsed.map(p => p.name)}` });
+        const links: Array<string> = [];
+        if (parsed && parsed.length) {
+            for (const query of parsed) {
+                const item = findInData(query, DATA);
+                if (item) {
+                    if (typeof item === "string") links.push(item);
+                    else links.push(item[0]);
+                }
+            }
+        }
+        if (!links.length) return;
+        shardClient.rest.createMessage(payload.message.channelId, { content: links.join("\n" )});
     });
 
     shardClient.run();
