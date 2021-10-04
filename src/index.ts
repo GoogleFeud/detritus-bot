@@ -35,9 +35,9 @@ dotenv.config();
                 const item = findInData(query, DATA, {
                     highlight: "__",
                     limit: 3,
-                    threshold: -1000
+                    threshold: query.exact ? -1 : -100
                 });
-                if (item) {
+                if (item && item.length) {
                     links.push(item[0]);
                     if (item.length > 1 && item[0].obj.name !== query.name) otherPossibilities.push(...item.slice(1));
                 }
