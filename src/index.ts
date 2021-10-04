@@ -2,7 +2,7 @@
 import dotenv from "dotenv";
 import {ShardClient} from "detritus-client";
 import { parseMessage } from "./messageParser";
-import { fetchContent, findInData } from "./contentFetch";
+import { ExtraSearchData, fetchContent, findInData } from "./contentFetch";
 dotenv.config();
 
 (async () => {
@@ -28,13 +28,18 @@ dotenv.config();
     shardClient.on("messageCreate", (payload) => {
         if (payload.message.author.bot) return;
         const parsed = parseMessage(payload.message.content);
-        const links: Array<{name: string, link: string, description?: string}> = [];
+        const links: Array<ExtraSearchData> = [];
+        const otherPossibilities = [];
         if (parsed && parsed.length) {
             for (const query of parsed) {
-                const item = findInData(query, DATA);
+                const item = findInData(query, DATA, {
+                    highlight: "__",
+                    limit: 3,
+                    threshold: -1000
+                });
                 if (item) {
-                    if (typeof item === "string") links.push({ link: item, name: `${query.name}${query.member ? `.${query.member}`:""}` });
-                    else links.push({link: item[0], description: item[1], name: `${query.name}${query.member ? `.${query.member}`:""}` });
+                    links.push(item[0]);
+                    if (item.length > 1 && item[0].obj.name !== query.name) otherPossibilities.push(...item.slice(1));
                 }
             }
             if (!links.length) {
@@ -43,11 +48,18 @@ dotenv.config();
             }
             shardClient.rest.createMessage(payload.message.channelId, { 
                 embed: {
-                    description: links.map(link => `**[${link.name}](${link.link})**${link.description ? ` - ${link.description.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                    description: links.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
                     footer: {
                         text: `Searched by ${payload.message.author.username}`,
                         iconUrl: payload.message.author.avatarUrl
-                    }
+                    },
+                    fields: otherPossibilities.length ? [
+                        {
+                            name: "Other possible results",
+                            value: otherPossibilities.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                        }
+                    ] : undefined,
+                    color: 0x42ba96
                 }
             });
         }
