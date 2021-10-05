@@ -1,9 +1,52 @@
 
 import dotenv from "dotenv";
-import {ShardClient} from "detritus-client";
+import {ShardClient, InteractionCommandClient, GatewayClientEvents } from "detritus-client";
 import { parseMessage } from "./messageParser";
-import { ExtraSearchData, fetchContent, findInData } from "./contentFetch";
+import { ExtraSearchData, fetchContent, findInData, LibData } from "./contentFetch";
+import { ApplicationCommandOptionTypes } from "detritus-client/lib/constants";
+import { InteractionContext } from "detritus-client/lib/interaction";
 dotenv.config();
+
+export function findAndSend(channel: GatewayClientEvents.MessageCreate|InteractionContext, queryStr: string, DATA: LibData, isParsed?: boolean) : void {
+    const parsed = isParsed ? [{ name: queryStr }] : parseMessage(queryStr);
+    const links: Array<ExtraSearchData> = [];
+    const otherPossibilities = [];
+    if (parsed && parsed.length) {
+        for (const query of parsed) {
+            const item = findInData(query, DATA, {
+                highlight: "__",
+                limit: 3,
+                threshold: query.exact ? -1 : -100
+            });
+            if (item && item.length) {
+                links.push(item[0]);
+                if (item.length > 1 && item[0].obj.name !== query.name) otherPossibilities.push(...item.slice(1));
+            }
+        }
+        if (!links.length) {
+            if (channel instanceof InteractionContext) channel.editOrRespond("Couldn't find anything!");
+            else channel.message.react("❌");
+            return;
+        }
+        const messageAuthor = channel instanceof InteractionContext ? channel.user : channel.message.author;
+        const embed = {
+            description: links.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+            footer: {
+                text: `Searched by ${messageAuthor.username}`,
+                iconUrl: messageAuthor.avatarUrl
+            },
+            fields: otherPossibilities.length ? [
+                {
+                    name: "Other possible results",
+                    value: otherPossibilities.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                }
+            ] : undefined,
+            color: 0x42ba96
+        };
+        if (channel instanceof InteractionContext) channel.editOrRespond({embed});
+        else channel.message.channel?.createMessage({embed});
+    }
+}
 
 (async () => {
     const DATA = await fetchContent(process.env.DOCS_URL as string);
@@ -23,49 +66,68 @@ dotenv.config();
         }
     });
 
-    //const commandClient = new Detritus.InteractionCommandClient(shardClient);
+    const commandClient = new InteractionCommandClient(shardClient);
 
     shardClient.on("messageCreate", (payload) => {
         if (payload.message.author.bot) return;
-        const parsed = parseMessage(payload.message.content);
-        const links: Array<ExtraSearchData> = [];
-        const otherPossibilities = [];
-        if (parsed && parsed.length) {
-            for (const query of parsed) {
-                const item = findInData(query, DATA, {
-                    highlight: "__",
-                    limit: 3,
-                    threshold: query.exact ? -1 : -100
-                });
-                if (item && item.length) {
-                    links.push(item[0]);
-                    if (item.length > 1 && item[0].obj.name !== query.name) otherPossibilities.push(...item.slice(1));
+        findAndSend(payload, payload.message.content, DATA);
+    });
+
+    commandClient.add({
+        name: "search",
+        disableDm: true,
+        description: "Search for something from the detritus docs",
+        options: [
+            {
+                name: "query",
+                required: true,
+                description: "What to search for",
+                type: ApplicationCommandOptionTypes.STRING,
+                onAutoComplete: (ctx) => {
+                    const choices: Array<{name: string, value: string}> = [];
+                    let name = ctx.value;
+                    let member;
+                    if (name.includes(".")) {
+                        const [newName, newMember] = name.split(".");
+                        name = newName;
+                        member = newMember;
+                    }
+                    const results = findInData({name, member}, DATA, {
+                        limit: 10,
+                        searchAll: true,
+                        excludeBase: true
+                    });
+                    if (results) choices.push(...results.map(res =>{
+                        const fullname = res.obj.preparedWithParent?.target || res.obj.name;
+                        return { name: res.obj.preparedWithParent?.target || res.obj.name, value: `${fullname}~${res.fullLink}` };
+                    }));
+                    return ctx.respond({choices});
                 }
             }
-            if (!links.length) {
-                payload.message.react("❌");
+        ],
+        run: (ctx) => {
+            if (!ctx.options) return;
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const query = ctx.options.get("query")!;
+            if (!query.value) return;
+            const [name, link] = (query.value as string).split("~");
+            if (!link) {
+                findAndSend(ctx, name, DATA, true);
                 return;
             }
-            shardClient.rest.createMessage(payload.message.channelId, { 
+            ctx.editOrRespond({
                 embed: {
-                    description: links.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
+                    description: `[${name}](${DATA.baseLink}${link}})`,
                     footer: {
-                        text: `Searched by ${payload.message.author.username}`,
-                        iconUrl: payload.message.author.avatarUrl
+                        text: `Searched by ${ctx.interaction.user.username}`,
+                        iconUrl: ctx.interaction.user.avatarUrl
                     },
-                    fields: otherPossibilities.length ? [
-                        {
-                            name: "Other possible results",
-                            value: otherPossibilities.map(link => `**[${link.highlighted || link.obj.name}](${link.fullLink})**${link.obj.comment ? ` - ${link.obj.comment.replace(/(\r\n|\n|\r)/gm, ", ")}...`:""}`).join("\n"),
-                        }
-                    ] : undefined,
                     color: 0x42ba96
                 }
             });
         }
     });
-
-    shardClient.run();
+    
+    await commandClient.run();
 })();
-
 

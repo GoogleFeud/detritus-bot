@@ -122,10 +122,12 @@ export interface ExtraSearchData {
 export function findInData(query: MessageFinding, data: LibData, settings: {
     highlight?: string,
     limit?: number,
-    threshold?: number
+    threshold?: number,
+    searchAll?: boolean,
+    excludeBase?: boolean
 }) : Array<ExtraSearchData>|undefined {
     if (!query.name.trim()) return;
-    let searchData = data.items;
+    let searchData = settings.searchAll ? data.all : data.items;
     let searchKey = "prepared";
     let searchTerm = query.name;
     if (query.member) {
@@ -141,7 +143,7 @@ export function findInData(query: MessageFinding, data: LibData, settings: {
     });
     return res.map(result => ({
         obj: result.obj,
-        fullLink: `${data.baseLink}/${result.obj.path.map(p => `m.${data.moduleNames[p]}`).join("/")}/${resultTypeToString[result.obj.type]}/${result.obj.parentName ? `${result.obj.parentName}.html#.${result.obj.name}`:`${result.obj.name}.html`}`,
+        fullLink: `${settings.excludeBase ? "" : data.baseLink}/${result.obj.path.map(p => `m.${data.moduleNames[p]}`).join("/")}/${resultTypeToString[result.obj.type]}/${result.obj.parentName ? `${result.obj.parentName}.html#.${result.obj.name}`:`${result.obj.name}.html`}`,
         highlighted: settings.highlight ? fuzzy.highlight(result, settings.highlight, settings.highlight) : null
     }));
 }
