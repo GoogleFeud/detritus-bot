@@ -7,7 +7,7 @@ import { ApplicationCommandOptionTypes } from "detritus-client/lib/constants";
 import { InteractionContext } from "detritus-client/lib/interaction";
 dotenv.config();
 
-export function findAndSend(channel: GatewayClientEvents.MessageCreate|InteractionContext, queryStr: string, DATA: LibData, isParsed?: boolean) : void {
+export function findAndSend(channel: GatewayClientEvents.MessageCreate|InteractionContext, queryStr: string, DATA: LibData, isParsed?: boolean, customLimit?: number) : void {
     const parsed = isParsed ? [{ name: queryStr }] : parseMessage(queryStr);
     const links: Array<ExtraSearchData> = [];
     const otherPossibilities = [];
@@ -15,10 +15,10 @@ export function findAndSend(channel: GatewayClientEvents.MessageCreate|Interacti
         for (const query of parsed) {
             const item = findInData(query, DATA, {
                 highlight: "__",
-                limit: 3,
+                limit: customLimit || 3,
                 threshold: query.exact ? -1 : -100
             });
-            if (item && item.length) {
+            if (item && item.length && !links.some(link => link.obj === item[0].obj)) {
                 links.push(item[0]);
                 if (item.length > 1 && item[0].obj.name !== query.name) otherPossibilities.push(...item.slice(1));
             }
@@ -44,7 +44,7 @@ export function findAndSend(channel: GatewayClientEvents.MessageCreate|Interacti
             color: 0x42ba96
         };
         if (channel instanceof InteractionContext) channel.editOrRespond({embed});
-        else channel.message.channel?.createMessage({embed});
+        else channel.message.client.rest.createMessage(channel.message.channelId, {embed});   
     }
 }
 
@@ -93,7 +93,7 @@ export function findAndSend(channel: GatewayClientEvents.MessageCreate|Interacti
                         member = newMember;
                     }
                     const results = findInData({name, member}, DATA, {
-                        limit: 10,
+                        limit: 25,
                         searchAll: true,
                         excludeBase: true
                     });
@@ -112,12 +112,12 @@ export function findAndSend(channel: GatewayClientEvents.MessageCreate|Interacti
             if (!query.value) return;
             const [name, link] = (query.value as string).split("~");
             if (!link) {
-                findAndSend(ctx, name, DATA, true);
+                findAndSend(ctx, name, DATA, true, 8);
                 return;
             }
             ctx.editOrRespond({
                 embed: {
-                    description: `[${name}](${DATA.baseLink}${link}})`,
+                    description: `**[${name}](${DATA.baseLink}${link})**`,
                     footer: {
                         text: `Searched by ${ctx.interaction.user.username}`,
                         iconUrl: ctx.interaction.user.avatarUrl
